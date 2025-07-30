@@ -40,9 +40,8 @@ public class StepController {
     }
 
     public void showCurrentStep() {
-        Location location = getCurrentStepLocation();
-        PacketUtil.showStepSlime(player, location);
-
+        if (isComplete()) return;
+        PacketUtil.showStepSlime(player, getCurrentStepLocation());
         steps.get(currentIndex).playStepAnimation(player);
     }
 
@@ -75,5 +74,4 @@ public class StepController {
     public Location getCurrentStepLocation() {
         return steps.get(currentIndex).getLocation();
     }
-
 }

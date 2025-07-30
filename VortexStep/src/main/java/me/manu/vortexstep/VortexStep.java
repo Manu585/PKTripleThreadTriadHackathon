@@ -13,6 +13,8 @@ import me.manu.vortexstep.util.AnimationHelper;
 import me.manu.vortexstep.util.PacketUtil;
 import me.manu.vortexstep.util.StepController;
 import org.bukkit.*;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -69,39 +71,41 @@ public class VortexStep extends AirAbility implements AddonAbility {
         player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 30, 10, true, false, false));
         player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 30, 5, true, false, false));
 
-        // Check if target leaves bounding box
-        if (target.getLocation().distance(center) > radius + 0.5) {
+        // Check if target leaves bounding box or step timeout
+        if (target.getLocation().distance(center) > radius + 0.5 || controller.isTimedOut()) {
             fail();
             return;
         }
 
-        if (controller.isTimedOut()) {
-            fail();
+        if (controller.isComplete()) {
+            player.removePotionEffect(PotionEffectType.SLOWNESS);
+
+            Block blockUnder = target.getLocation().getBlock().getRelative(BlockFace.DOWN);
+            Location vortexCenter = blockUnder.getLocation().add(0.5, 1.0, 0.5);
+
+            AnimationHelper.createVortex(vortexCenter, 10, 3, 16, AirAbility.getAirbendingParticles().getParticle(), 8, .1, .1, .1);
+
             return;
         }
 
         controller.showCurrentStep();
 
-        if (player.isSneaking()) {
-            if (controller.canAdvance(15.0)) {
-                Location from = player.getLocation().clone();
-                Location to = controller.getCurrentStepLocation().clone();
+        if (player.isSneaking() && controller.canAdvance(15.0)) {
+            Location from = player.getLocation().clone();
+            Location to = controller.getCurrentStepLocation().clone();
 
-                Location here = player.getLocation();
-                to.setYaw(here.getYaw());
-                to.setPitch(here.getPitch());
+            Location here = player.getLocation();
+            to.setYaw(here.getYaw());
+            to.setPitch(here.getPitch());
 
-                AnimationHelper.drawParticleLine(from, to, Particle.CLOUD, 0.2, 0.2, 0.2, 50);
+            Location fromRaised = from.clone().add(0, 0.5, 0);
+            Location toRaised = to.clone().add(0, 0.5, 0);
 
-                player.teleport(to);
-                controller.advance();
-                player.playSound(player.getLocation(), Sound.ITEM_MACE_SMASH_AIR, SoundCategory.MASTER, 2, 2.0f);
+            AnimationHelper.drawParticleLine(fromRaised, toRaised, Particle.CLOUD, .1, .2, .1, 60);
 
-                if (controller.isComplete()) {
-                    // TODO: Create Vortex
-                    remove();
-                }
-            }
+            player.teleport(to);
+            controller.advance();
+            player.playSound(player.getLocation(), Sound.ITEM_MACE_SMASH_AIR, SoundCategory.MASTER, 2, 2.0f);
         }
     }
 

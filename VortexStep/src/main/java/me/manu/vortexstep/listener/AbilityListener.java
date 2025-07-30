@@ -31,6 +31,7 @@ public class AbilityListener implements Listener {
         Player player = event.getPlayer();
         BendingPlayer bendingPlayer = BendingPlayer.getBendingPlayer(player);
 
+        if (bendingPlayer == null) return;
         if (bendingPlayer.getBoundAbility() == null) return;
 
         if (CoreAbility.getAbility(player, VortexStep.class) != null) {
