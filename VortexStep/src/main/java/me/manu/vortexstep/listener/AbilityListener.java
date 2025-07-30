@@ -2,7 +2,7 @@ package me.manu.vortexstep.listener;
 
 import com.projectkorra.projectkorra.BendingPlayer;
 import com.projectkorra.projectkorra.ability.CoreAbility;
-import me.manu.vortexstep.VortexStep;
+import me.manu.vortexstep.ability.VortexStep;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -22,6 +22,8 @@ public class AbilityListener implements Listener {
         if (bendingPlayer.getBoundAbility() == null) return;
 
         if (bendingPlayer.getBoundAbility().equals(CoreAbility.getAbility(VortexStep.class))) {
+            if (CoreAbility.hasAbility(player, VortexStep.class)) return;
+            if (!bendingPlayer.canBend(CoreAbility.getAbility(VortexStep.class))) return;
             new VortexStep(player);
         }
     }

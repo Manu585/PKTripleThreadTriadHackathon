@@ -1,10 +1,9 @@
-package me.manu.vortexstep;
+package me.manu.vortexstep.ability;
 
 import com.projectkorra.projectkorra.GeneralMethods;
 import com.projectkorra.projectkorra.ProjectKorra;
 import com.projectkorra.projectkorra.ability.AddonAbility;
 import com.projectkorra.projectkorra.ability.AirAbility;
-import com.projectkorra.projectkorra.ability.CoreAbility;
 import com.projectkorra.projectkorra.attribute.Attribute;
 import com.projectkorra.projectkorra.configuration.ConfigManager;
 import com.projectkorra.projectkorra.region.RegionProtection;
@@ -17,20 +16,25 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.HandlerList;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 public class VortexStep extends AirAbility implements AddonAbility {
+    private static final String PATH = "ExtraAbilities.Manu.Air.VortexStep.";
+
     @Attribute(Attribute.COOLDOWN)
     private final long cooldown;
+    @Attribute(Attribute.DURATION)
+    private final long duration;
     @Attribute(Attribute.RANGE)
     private final double range;
 
     private final int radius;
     private final int maxSteps;
     private final long stepTimeOut;
+    private final Entity target;
 
-    private Entity target;
     private Location center;
     private StepController controller;
     private boolean initialized;
@@ -38,16 +42,15 @@ public class VortexStep extends AirAbility implements AddonAbility {
     public VortexStep(Player player) {
         super(player);
 
-        this.cooldown = ConfigManager.defaultConfig.get().getLong("ExtraAbilities.Manu.Air.VortexStep.Cooldown");
-        this.range = ConfigManager.defaultConfig.get().getDouble("ExtraAbilities.Manu.Air.VortexStep.Range");
-        this.radius = ConfigManager.defaultConfig.get().getInt("ExtraAbilities.Manu.Air.VortexStep.Radius");
-        this.maxSteps = ConfigManager.defaultConfig.get().getInt("ExtraAbilities.Manu.Air.VortexStep.MaxSteps");
+        this.cooldown = ConfigManager.getConfig().getLong(PATH + "Cooldown");
+        this.duration = ConfigManager.getConfig().getLong(PATH + "Duration");
+        this.maxSteps = ConfigManager.getConfig().getInt(PATH + "MaxSteps");
+        this.range = ConfigManager.getConfig().getDouble(PATH + "Range");
+        this.radius = ConfigManager.getConfig().getInt(PATH + "Radius");
         this.stepTimeOut = 5_000;
 
-        if (!bPlayer.canBend(this)) return;
-        if (CoreAbility.hasAbility(player, VortexStep.class)) return;
-
         this.target = GeneralMethods.getTargetedEntity(this.player, range);
+
         if (this.target == null) return;
         if (RegionProtection.isRegionProtected(this.player, this.target.getLocation(), this)) return;
 
@@ -126,7 +129,7 @@ public class VortexStep extends AirAbility implements AddonAbility {
 
     @Override
     public String getName() {
-        return "VortexStep";
+        return "TornadoStep";
     }
 
     @Override
@@ -141,17 +144,21 @@ public class VortexStep extends AirAbility implements AddonAbility {
 
     @Override
     public void load() {
-        ConfigManager.defaultConfig.get().addDefault("ExtraAbilities.Manu.Air.VortexStep.Cooldown", 1000);
-        ConfigManager.defaultConfig.get().addDefault("ExtraAbilities.Manu.Air.VortexStep.Range", 5);
-        ConfigManager.defaultConfig.get().addDefault("ExtraAbilities.Manu.Air.VortexStep.Radius", 5);
-        ConfigManager.defaultConfig.get().addDefault("ExtraAbilities.Manu.Air.VortexStep.MaxSteps", 3);
+        ConfigManager.getConfig().addDefault(PATH + "Cooldown", 1000);
+        ConfigManager.getConfig().addDefault(PATH + "Duration", 8000);
+        ConfigManager.getConfig().addDefault(PATH + "Range", 5);
+        ConfigManager.getConfig().addDefault(PATH + "Radius", 5);
+        ConfigManager.getConfig().addDefault(PATH + "MaxSteps", 3);
         ConfigManager.defaultConfig.save();
 
         Bukkit.getServer().getPluginManager().registerEvents(new AbilityListener(), ProjectKorra.plugin);
     }
 
     @Override
-    public void stop() {}
+    public void stop() {
+        HandlerList.unregisterAll(new AbilityListener());
+        PacketUtil.removeSlime(player);
+    }
 
     @Override
     public void remove() {
@@ -178,5 +185,41 @@ public class VortexStep extends AirAbility implements AddonAbility {
     private void fail() {
         player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 0, true, false, false));
         remove();
+    }
+
+    public long getDuration() {
+        return duration;
+    }
+
+    public double getRange() {
+        return range;
+    }
+
+    public int getRadius() {
+        return radius;
+    }
+
+    public int getMaxSteps() {
+        return maxSteps;
+    }
+
+    public long getStepTimeOut() {
+        return stepTimeOut;
+    }
+
+    public Entity getTarget() {
+        return target;
+    }
+
+    public Location getCenter() {
+        return center;
+    }
+
+    public StepController getController() {
+        return controller;
+    }
+
+    public boolean isInitialized() {
+        return initialized;
     }
 }
