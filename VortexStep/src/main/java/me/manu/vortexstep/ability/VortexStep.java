@@ -8,12 +8,12 @@ import com.projectkorra.projectkorra.attribute.Attribute;
 import com.projectkorra.projectkorra.configuration.ConfigManager;
 import com.projectkorra.projectkorra.region.RegionProtection;
 import me.manu.vortexstep.listener.AbilityListener;
-import me.manu.vortexstep.util.AnimationHelper;
+import me.manu.vortexstep.manager.StepController;
 import me.manu.vortexstep.util.PacketUtil;
-import me.manu.vortexstep.util.StepController;
-import org.bukkit.*;
-import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Sound;
+import org.bukkit.SoundCategory;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
@@ -30,6 +30,8 @@ public class VortexStep extends AirAbility implements AddonAbility {
     @Attribute(Attribute.RANGE)
     private final double range;
 
+    private final double minStepDistance;
+
     private final int radius;
     private final int maxSteps;
     private final long stepTimeOut;
@@ -39,6 +41,10 @@ public class VortexStep extends AirAbility implements AddonAbility {
     private StepController controller;
     private boolean initialized;
 
+    private boolean tornadoActive = false;
+    private long tornadoStart = 0;
+    private Vortex tornadoEffect;
+
     public VortexStep(Player player) {
         super(player);
 
@@ -47,6 +53,7 @@ public class VortexStep extends AirAbility implements AddonAbility {
         this.maxSteps = ConfigManager.getConfig().getInt(PATH + "MaxSteps");
         this.range = ConfigManager.getConfig().getDouble(PATH + "Range");
         this.radius = ConfigManager.getConfig().getInt(PATH + "Radius");
+        this.minStepDistance = ConfigManager.getConfig().getDouble(PATH + "MinStepDistance");
         this.stepTimeOut = 5_000;
 
         this.target = GeneralMethods.getTargetedEntity(this.player, range);
@@ -59,7 +66,7 @@ public class VortexStep extends AirAbility implements AddonAbility {
 
     @Override
     public void progress() {
-        if (!bPlayer.canBend(this)) {
+        if (!bPlayer.canBendIgnoreBinds(this)) {
             remove();
             return;
         }
@@ -67,12 +74,13 @@ public class VortexStep extends AirAbility implements AddonAbility {
         if (!initialized) {
             player.playSound(player.getLocation(), Sound.BLOCK_BEACON_DEACTIVATE, SoundCategory.MASTER, 2, 0.5f);
             this.center = target.getLocation().clone();
-            this.controller = new StepController(player, center, radius, maxSteps, stepTimeOut);
+            this.controller = new StepController(player, center, radius, maxSteps, minStepDistance, stepTimeOut);
             this.initialized = true;
         }
 
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 30, 10, true, false, false));
-        player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 30, 5, true, false, false));
+        if (!tornadoActive) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 30, 10, true, false, false));
+        }
 
         // Check if target leaves bounding box or step timeout
         if (target.getLocation().distance(center) > radius + 0.5 || controller.isTimedOut()) {
@@ -80,35 +88,30 @@ public class VortexStep extends AirAbility implements AddonAbility {
             return;
         }
 
-        if (controller.isComplete()) {
-            player.removePotionEffect(PotionEffectType.SLOWNESS);
-
-            Block blockUnder = target.getLocation().getBlock().getRelative(BlockFace.DOWN);
-            Location vortexCenter = blockUnder.getLocation().add(0.5, 1.0, 0.5);
-
-            AnimationHelper.createVortex(vortexCenter, 10, 3, 16, AirAbility.getAirbendingParticles().getParticle(), 8, .1, .1, .1);
-
+        if (!controller.isComplete()) {
+            controller.showCurrentStep();
+            if (player.isSneaking() && controller.canAdvance(10.0)) {
+                controller.advance();
+            }
             return;
         }
 
-        controller.showCurrentStep();
+        if (!tornadoActive) {
+            tornadoActive = true;
+            tornadoStart = System.currentTimeMillis();
+            PacketUtil.removeSlime(player);
 
-        if (player.isSneaking() && controller.canAdvance(15.0)) {
-            Location from = player.getLocation().clone();
-            Location to = controller.getCurrentStepLocation().clone();
+            tornadoEffect = new Vortex(target, 0.3, 8.0, 40, 0.5, 6, 0.8, 0.03, 0.6, AirAbility.getAirbendingParticles().getParticle(), 2, .1, .1, .1);
+            tornadoEffect.start();
 
-            Location here = player.getLocation();
-            to.setYaw(here.getYaw());
-            to.setPitch(here.getPitch());
+            player.removePotionEffect(PotionEffectType.SLOWNESS);
+        }
 
-            Location fromRaised = from.clone().add(0, 0.5, 0);
-            Location toRaised = to.clone().add(0, 0.5, 0);
-
-            AnimationHelper.drawParticleLine(fromRaised, toRaised, Particle.CLOUD, .1, .2, .1, 60);
-
-            player.teleport(to);
-            controller.advance();
-            player.playSound(player.getLocation(), Sound.ITEM_MACE_SMASH_AIR, SoundCategory.MASTER, 2, 2.0f);
+        long elapse = System.currentTimeMillis() - tornadoStart;
+        if (elapse < duration) {
+            tornadoEffect.update();
+        } else {
+            remove();
         }
     }
 
@@ -149,6 +152,7 @@ public class VortexStep extends AirAbility implements AddonAbility {
         ConfigManager.getConfig().addDefault(PATH + "Range", 5);
         ConfigManager.getConfig().addDefault(PATH + "Radius", 5);
         ConfigManager.getConfig().addDefault(PATH + "MaxSteps", 3);
+        ConfigManager.getConfig().addDefault(PATH + "MinStepDistance", 8);
         ConfigManager.defaultConfig.save();
 
         Bukkit.getServer().getPluginManager().registerEvents(new AbilityListener(), ProjectKorra.plugin);
@@ -163,12 +167,8 @@ public class VortexStep extends AirAbility implements AddonAbility {
     @Override
     public void remove() {
         bPlayer.addCooldown(this);
-
         initialized = false;
-        player.removePotionEffect(PotionEffectType.SLOWNESS);
-
         PacketUtil.removeSlime(player);
-
         super.remove();
     }
 
@@ -183,7 +183,8 @@ public class VortexStep extends AirAbility implements AddonAbility {
     }
 
     private void fail() {
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 0, true, false, false));
+        player.removePotionEffect(PotionEffectType.SLOWNESS);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 80, 1, true, false, false));
         remove();
     }
 

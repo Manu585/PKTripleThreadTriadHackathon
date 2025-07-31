@@ -21,6 +21,7 @@ public class PacketUtil {
     private static final Map<UUID, FakeSlime> PLAYER_SLIMES = new HashMap<>();
 
     public static void showStepSlime(Player player, Location location) {
+        if (player == null) return;
         FakeSlime slime = PLAYER_SLIMES.get(player.getUniqueId());
 
         if (slime == null) {
@@ -33,6 +34,7 @@ public class PacketUtil {
     }
 
     public static void removeSlime(Player player) {
+        if (player == null) return;
         FakeSlime slime = PLAYER_SLIMES.remove(player.getUniqueId());
 
         if (slime != null) {
@@ -74,6 +76,7 @@ public class PacketUtil {
 
             List<EntityData<?>> data = List.of(
                     new EntityData<>(0, EntityDataTypes.BYTE, flags), // invisible & glowing
+                    new EntityData<>(4, EntityDataTypes.BOOLEAN, true), // Silent
                     new EntityData<>(5, EntityDataTypes.BOOLEAN, true), // noGravity
                     new EntityData<>(15, EntityDataTypes.BYTE, (byte) 1), // noAI
                     new EntityData<>(16, EntityDataTypes.INT, 1) // small

@@ -1,4 +1,4 @@
-package me.manu.vortexstep.util;
+package me.manu.vortexstep.manager;
 
 import org.bukkit.Location;
 import org.bukkit.Particle;
